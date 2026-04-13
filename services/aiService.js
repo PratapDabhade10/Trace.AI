@@ -1,13 +1,22 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// Local Inference mechanism for embeddings
+let pipeline = null;
+async function getPipeline() {
+  if (pipeline) return pipeline;
+  const transformers = await import('@xenova/transformers');
+  // Load local embedding model
+  pipeline = await transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+  console.log('✅ Local Transformers Pipeline loaded');
+  return pipeline;
+}
 
 // Extract reasoning, decision, summary, tags from raw content
 async function extractReasoning(content, source) {
   const prompt = `You are analyzing a ${source} message from a company.
-Extract the following as valid JSON only, no markdown, no backticks:
+Extract the following as valid JSON only:
 
 {
   "summary": "one line summary",
@@ -22,13 +31,13 @@ ${content}
 Return ONLY valid JSON.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    // Strip markdown if present
-    if (text.startsWith('```')) {
-      text = text.replace(/```json|```/g, '').trim();
-    }
-    return JSON.parse(text);
+    const result = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile',
+      response_format: { type: "json_object" }
+    });
+    
+    return JSON.parse(result.choices[0].message.content);
   } catch (err) {
     console.error('extractReasoning error:', err.message);
     return {
@@ -40,11 +49,14 @@ Return ONLY valid JSON.`;
   }
 }
 
-// Get embedding vector for a text
+// Get embedding vector natively via transformers.js
 async function getEmbedding(text) {
   try {
-    const result = await embeddingModel.embedContent(text);
-    return result.embedding.values;
+    const extractor = await getPipeline();
+    // Generate embeddings
+    const output = await extractor(text, { pooling: 'mean', normalize: true });
+    // Convert to standard JS array format required by ChromaDB
+    return Array.from(output.data);
   } catch (err) {
     console.error('getEmbedding error:', err.message);
     return [];
@@ -68,12 +80,15 @@ Question: ${question}
 Give a clear, concise answer and cite the exact source.`;
 
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    const result = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile'
+    });
+    return result.choices[0].message.content;
   } catch (err) {
     console.error('answerQuestion error:', err.message);
     throw new Error('Failed to generate answer');
   }
 }
 
-module.exports = { extractReasoning, getEmbedding, answerQuestion };
+module.exports = { extractReasoning, getEmbedding, answerQuestion };

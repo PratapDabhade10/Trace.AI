@@ -1,12 +1,28 @@
 const neo4j = require('neo4j-driver');
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI,
-  neo4j.auth.basic(process.env.NEO4J_USERNAME, process.env.NEO4J_PASSWORD)
-);
+let driver = null;
+
+function getDriver() {
+  if (driver) return driver;
+
+  const uri = process.env.NEO4J_URI;
+  const username = process.env.NEO4J_USERNAME;
+  const password = process.env.NEO4J_PASSWORD;
+
+  if (!uri || !username || !password) {
+    console.warn('⚠️  Neo4j credentials not set, graph features disabled');
+    return null;
+  }
+
+  driver = neo4j.driver(uri, neo4j.auth.basic(username, password));
+  return driver;
+}
 
 async function storeDocumentNode(docId, title, source, decision, tags) {
-  const session = driver.session();
+  const d = getDriver();
+  if (!d) return;
+
+  const session = d.session();
   try {
     // Create Document node
     await session.run(
@@ -44,7 +60,10 @@ async function storeDocumentNode(docId, title, source, decision, tags) {
 }
 
 async function getRelatedDocuments(tags) {
-  const session = driver.session();
+  const d = getDriver();
+  if (!d) return [];
+
+  const session = d.session();
   try {
     const result = await session.run(
       `MATCH (d:Document)-[:HAS_TAG]->(t:Tag)

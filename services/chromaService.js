@@ -9,7 +9,7 @@ async function getCollection() {
 
   try {
     collection = await client.getOrCreateCollection({
-      name: 'orgmind_docs',
+      name: 'orgmind_docs_v2',
       metadata: { 'hnsw:space': 'cosine' }
     });
     console.log('✅ ChromaDB collection ready');
@@ -33,6 +33,8 @@ async function addToChroma(docId, embedding, content, metadata) {
     });
   } catch (err) {
     console.warn('ChromaDB add failed:', err.message);
+    // Invalidate cached collection so next call retries the connection
+    collection = null;
   }
 }
 
@@ -47,6 +49,8 @@ async function queryChroma(embedding, nResults = 4) {
     return results.ids[0] || [];
   } catch (err) {
     console.warn('ChromaDB query failed:', err.message);
+    // Invalidate cached collection so next call retries the connection
+    collection = null;
     return [];
   }
 }

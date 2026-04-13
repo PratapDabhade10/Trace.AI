@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const DocumentSchema = new mongoose.Schema({
   source: {
     type: String,
-    enum: ['gmail', 'slack', 'meeting', 'document'],
     required: true
   },
   title: { type: String, required: true },
@@ -16,9 +15,17 @@ const DocumentSchema = new mongoose.Schema({
     sender: String,
     channel: String,
     date: String,
-    participants: [String]
+    participants: [String],
+    messageId: String,
+    googleDocId: String,
+    createdTime: String,
+    modifiedTime: String,
+    fullLength: Number
   },
   createdAt: { type: Date, default: Date.now }
 });
+
+// Text index for MongoDB $text search fallback in ask.js
+DocumentSchema.index({ title: 'text', rawContent: 'text', summary: 'text' });
 
 module.exports = mongoose.model('Document', DocumentSchema);

@@ -8,6 +8,8 @@ const askRoutes = require('./routes/ask');
 const documentsRoutes = require('./routes/documents');
 const slackRoutes = require('./routes/slack');
 const gmailRoutes = require('./routes/gmail');
+const gdocsRoutes = require('./routes/gdocs');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
@@ -15,11 +17,13 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/ingest', ingestRoutes);
 app.use('/api/ask', askRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/slack', slackRoutes);
-app.use('/auth', gmailRoutes);
+app.use('/api/gdocs', gdocsRoutes);
+app.use('/', gmailRoutes);
 
 app.get('/', (req, res) => {
   res.json({ status: 'OrgMind API running 🚀', routes: [
